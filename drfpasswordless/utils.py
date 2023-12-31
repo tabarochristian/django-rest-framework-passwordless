@@ -183,7 +183,7 @@ def send_sms_with_callback_token(user, mobile_token, **kwargs):
 
             to_number = getattr(user, api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME)
             if to_number.__class__.__name__ == 'PhoneNumber':
-                to_number = to_number.__str__()
+                to_number = to_number.as_e164 if hasattr(to_number, 'as_e164') else to_number.__str__()
 
             twilio_client.messages.create(
                 body=base_string % mobile_token.key,
