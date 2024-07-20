@@ -52,7 +52,7 @@ class AbstractBaseAliasAuthenticationSerializer(serializers.Serializer):
             else:
                 # If new aliases should not register new users.
                 try:
-                    user = User.objects.get(**{self.alias_type+'__iexact': alias})
+                    user = User.objects.get(**{self.alias_type: alias})
                 except User.DoesNotExist:
                     user = None
 
@@ -202,7 +202,7 @@ class CallbackTokenAuthSerializer(AbstractBaseCallbackTokenSerializer):
         try:
             alias_type, alias = self.validate_alias(attrs)
             callback_token = attrs.get('token', None)
-            user = User.objects.get(**{alias_type+'__iexact': alias})
+            user = User.objects.get(**{alias_type: alias})
             token = CallbackToken.objects.get(**{'user': user,
                                                  'key': callback_token,
                                                  'type': CallbackToken.TOKEN_TYPE_AUTH,
@@ -252,7 +252,7 @@ class CallbackTokenVerificationSerializer(AbstractBaseCallbackTokenSerializer):
         try:
             alias_type, alias = self.validate_alias(attrs)
             user_id = self.context.get("user_id")
-            user = User.objects.get(**{'id': user_id, alias_type+'__iexact': alias})
+            user = User.objects.get(**{'id': user_id, alias_type: alias})
             callback_token = attrs.get('token', None)
 
             token = CallbackToken.objects.get(**{'user': user,
