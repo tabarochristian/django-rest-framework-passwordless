@@ -40,14 +40,21 @@ class AbstractBaseAliasAuthenticationSerializer(serializers.Serializer):
         if alias:
             # Create or authenticate a user
             # Return THem
-            try:
-                user = User.objects.get(**{self.alias_type+'__iexact': alias})
-            except User.DoesNotExist:
-                if not api_settings.PASSWORDLESS_REGISTER_NEW_USERS:
-                    raise serializers.ValidationError("No account is associated with this alias.")
-                user = User.objects.create(**{self.alias_type: alias})
-                user.set_unusable_password()
-                user.save()
+
+            if api_settings.PASSWORDLESS_REGISTER_NEW_USERS is True:
+                # If new aliases should register new users.
+                try:
+                    user = User.objects.get(**{self.alias_type+'__iexact': alias})
+                except User.DoesNotExist:
+                    user = User.objects.create(**{self.alias_type: alias})
+                    user.set_unusable_password()
+                    user.save()
+            else:
+                # If new aliases should not register new users.
+                try:
+                    user = User.objects.get(**{self.alias_type+'__iexact': alias})
+                except User.DoesNotExist:
+                    user = None
 
             if user:
                 if not user.is_active:
@@ -195,7 +202,7 @@ class CallbackTokenAuthSerializer(AbstractBaseCallbackTokenSerializer):
         try:
             alias_type, alias = self.validate_alias(attrs)
             callback_token = attrs.get('token', None)
-            user = User.objects.get(**{alias_type: alias})
+            user = User.objects.get(**{alias_type+'__iexact': alias})
             token = CallbackToken.objects.get(**{'user': user,
                                                  'key': callback_token,
                                                  'type': CallbackToken.TOKEN_TYPE_AUTH,
@@ -292,5 +299,4 @@ class TokenResponseSerializer(serializers.Serializer):
     """
     token = serializers.CharField(source='key')
     key = serializers.CharField(write_only=True)
-
 
