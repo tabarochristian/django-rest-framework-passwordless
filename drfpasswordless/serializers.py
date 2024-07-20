@@ -40,7 +40,6 @@ class AbstractBaseAliasAuthenticationSerializer(serializers.Serializer):
         if alias:
             # Create or authenticate a user
             # Return THem
-
             try:
                 user = User.objects.get(**{self.alias_type+'__iexact': alias})
             except User.DoesNotExist:
