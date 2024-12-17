@@ -39,15 +39,16 @@ def create_callback_token_for_user(user, alias_type, token_type):
     token = None
     alias_type_u = alias_type.upper()
     to_alias_field = getattr(api_settings, f'PASSWORDLESS_USER_{alias_type_u}_FIELD_NAME')
-    demo_users = User.objects.filter(pk__in=api_settings.PASSWORDLESS_DEMO_USERS.keys())
-    if user.pk in demo_users:
+    demo_users = User.objects.filter(mobile__in=api_settings.PASSWORDLESS_DEMO_USERS.keys())
+    demo_users = list(demo_users.values_list('mobile', flat=True))
+    if user.mobile in demo_users:
         token = CallbackToken.objects.filter(user=user).first()
         if token:
             return token
         else:
             return CallbackToken.objects.create(
                 user=user,
-                key=api_settings.PASSWORDLESS_DEMO_USERS[user.pk],
+                key=api_settings.PASSWORDLESS_DEMO_USERS[user.mobile],
                 to_alias_type=alias_type_u,
                 to_alias=getattr(user, to_alias_field),
                 type=token_type
