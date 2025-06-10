@@ -34,23 +34,22 @@ def authenticate_by_token(callback_token):
 
     return None
 
-
 def create_callback_token_for_user(user, alias_type, token_type):
     token = None
     alias_type_u = alias_type.upper()
     to_alias_field = getattr(api_settings, f'PASSWORDLESS_USER_{alias_type_u}_FIELD_NAME')
-    demo_users = User.objects.filter(mobile__in=api_settings.PASSWORDLESS_DEMO_USERS.keys())
-    demo_users = list(demo_users.values_list('mobile', flat=True))
-    if user.mobile.as_e164 in demo_users:
-        token = CallbackToken.objects.filter(user=user)
-        if token.first(): token.delete()
-        return CallbackToken.objects.create(
-            user=user,
-            key=api_settings.PASSWORDLESS_DEMO_USERS[user.mobile.as_e164],
-            to_alias_type=alias_type_u,
-            to_alias=getattr(user, to_alias_field),
-            type=token_type
-        )
+    alias = str(getattr(user, to_alias_field, "pk"))
+    if alias in api_settings.PASSWORDLESS_DEMO_USERS.keys():
+        if token := CallbackToken.objects.filter(user=user).first():
+            return token
+        else:
+            return CallbackToken.objects.create(
+                user=user,
+                key=api_settings.PASSWORDLESS_DEMO_USERS[alias],
+                to_alias_type=alias_type_u,
+                to_alias=getattr(user, to_alias_field),
+                type=token_type
+            )
     
     token = CallbackToken.objects.create(user=user,
                                             to_alias_type=alias_type_u,
@@ -63,7 +62,6 @@ def create_callback_token_for_user(user, alias_type, token_type):
         return token
 
     return None
-
 
 def validate_token_age(callback_token):
     """
