@@ -1,3 +1,4 @@
+import os
 import logging
 from django.utils.module_loading import import_string
 from rest_framework import parsers, renderers, status
@@ -14,10 +15,15 @@ from drfpasswordless.serializers import (
     EmailVerificationSerializer,
     MobileVerificationSerializer,
 )
+
+from rest_framework.throttling import AnonRateThrottle
 from drfpasswordless.services import TokenService
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
+class SMSRateThrottle(AnonRateThrottle):
+    rate = getattr(settings, "SMS_THROTTLE_RATE", "5/min")
 
 class AbstractBaseObtainCallbackToken(APIView):
     """
@@ -86,6 +92,7 @@ class ObtainEmailCallbackToken(AbstractBaseObtainCallbackToken):
 
 class ObtainMobileCallbackToken(AbstractBaseObtainCallbackToken):
     permission_classes = (AllowAny,)
+    throttle_classes = [SMSRateThrottle]
     serializer_class = MobileAuthSerializer
     success_response = "We texted you a login code."
     failure_response = "Unable to send you a login code. Try again later."
@@ -117,6 +124,7 @@ class ObtainEmailVerificationCallbackToken(AbstractBaseObtainCallbackToken):
 
 
 class ObtainMobileVerificationCallbackToken(AbstractBaseObtainCallbackToken):
+    throttle_classes = [SMSRateThrottle]
     permission_classes = (IsAuthenticated,)
     serializer_class = MobileVerificationSerializer
     success_response = "We texted you a verification code."
