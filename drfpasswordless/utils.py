@@ -50,17 +50,10 @@ def create_callback_token_for_user(user, alias_type, token_type):
             type=token_type
         )
     
-    token = CallbackToken.objects.create(user=user,
-                                            to_alias_type=alias_type_u,
-                                            to_alias=getattr(user, to_alias_field),
-                                            type=token_type)
-
-
-
-    if token is not None:
-        return token
-
-    return None
+    return CallbackToken.objects.create(user=user,
+                                        to_alias_type=alias_type_u,
+                                        to_alias=getattr(user, to_alias_field),
+                                        type=token_type)
 
 def validate_token_age(callback_token):
     """
