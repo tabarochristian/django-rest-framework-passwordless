@@ -1,3 +1,4 @@
+# views.py
 import os
 import logging
 from django.utils.module_loading import import_string
@@ -60,7 +61,7 @@ class AbstractBaseObtainCallbackToken(APIView):
             user = serializer.validated_data['user']
             # Create and send callback token
             success = TokenService.send_token(user, self.alias_type, self.token_type, **self.message_payload)
-
+            
             # Respond With Success Or Failure of Sent
             if success:
                 status_code = status.HTTP_200_OK
@@ -102,6 +103,19 @@ class ObtainMobileCallbackToken(AbstractBaseObtainCallbackToken):
 
     mobile_message = api_settings.PASSWORDLESS_MOBILE_MESSAGE
     message_payload = {"mobile_message": mobile_message}
+
+
+class ObtainMobileCallToken(AbstractBaseObtainCallbackToken):
+    permission_classes = (AllowAny,)
+    throttle_classes = [SMSRateThrottle]
+    serializer_class = MobileAuthSerializer
+    success_response = "We gave you a missed call. Enter the caller number as the token."
+    failure_response = "Unable to give you a missed call. Try again later."
+
+    alias_type = "call"
+    token_type = CallbackToken.TOKEN_TYPE_AUTH
+
+    message_payload = {}
 
 
 class ObtainEmailVerificationCallbackToken(AbstractBaseObtainCallbackToken):
@@ -185,4 +199,4 @@ class VerifyAliasFromCallbackToken(APIView):
         else:
             logger.error("Couldn't verify unknown user. Errors on serializer: {}".format(serializer.error_messages))
 
-        return Response({"detail": "We couldn't verify this alias. Try again later."}, status.HTTP_400_BAD_REQUEST)
+        return Response({"detail": "We couldn't verify this alias. Try again later."}, status=status.HTTP_400_BAD_REQUEST)

@@ -3,6 +3,7 @@ from django.urls import path
 from drfpasswordless.views import (
      ObtainEmailCallbackToken,
      ObtainMobileCallbackToken,
+     ObtainMobileCallToken,
      ObtainAuthTokenFromCallbackToken,
      VerifyAliasFromCallbackToken,
      ObtainEmailVerificationCallbackToken,
@@ -14,7 +15,7 @@ app_name = 'drfpasswordless'
 urlpatterns = [
      path(api_settings.PASSWORDLESS_AUTH_PREFIX + 'email/', ObtainEmailCallbackToken.as_view(), name='auth_email'),
      path(api_settings.PASSWORDLESS_AUTH_PREFIX + 'mobile/sms', ObtainMobileCallbackToken.as_view(), name='auth_mobile'),
-     path(api_settings.PASSWORDLESS_AUTH_PREFIX + 'mobile/call', ObtainMobileCallbackToken.as_view(), name='auth_mobile'),
+     path(api_settings.PASSWORDLESS_AUTH_PREFIX + 'mobile/call', ObtainMobileCallToken.as_view(), name='auth_mobile'),
      
      path(api_settings.PASSWORDLESS_AUTH_PREFIX + 'token/', ObtainAuthTokenFromCallbackToken.as_view(), name='auth_token'),
      path(api_settings.PASSWORDLESS_VERIFY_PREFIX + 'email/', ObtainEmailVerificationCallbackToken.as_view(), name='verify_email'),

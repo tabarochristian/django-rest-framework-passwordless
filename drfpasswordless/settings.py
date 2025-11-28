@@ -1,3 +1,4 @@
+# settings.py
 from django.conf import settings
 from rest_framework.settings import APISettings
 
@@ -6,7 +7,7 @@ USER_SETTINGS = getattr(settings, 'PASSWORDLESS_AUTH', None)
 DEFAULTS = {
 
     # Allowed auth types, can be EMAIL, MOBILE, or both.
-    'PASSWORDLESS_AUTH_TYPES': ['EMAIL'],
+    'PASSWORDLESS_AUTH_TYPES': ['EMAIL', 'CALL'],
 
     # URL Prefix for Authentication Endpoints
     'PASSWORDLESS_AUTH_PREFIX': 'auth/',
@@ -51,6 +52,12 @@ DEFAULTS = {
     # The message sent to mobile users logging in. Takes one string.
     'PASSWORDLESS_MOBILE_MESSAGE': "Use this code to log in: %s",
 
+    # The message sent via call to users logging in. Takes one string for the code.
+    'PASSWORDLESS_CALL_MESSAGE': "Use this code to log in: %s",
+
+    # Pool of virtual numbers for missed call authentication
+    'PASSWORDLESS_VIRTUAL_NUMBER_POOL': [],
+
     # Registers previously unseen aliases as new users.
     'PASSWORDLESS_REGISTER_NEW_USERS': True,
 
@@ -87,6 +94,7 @@ DEFAULTS = {
     'PASSWORDLESS_DEMO_USERS': {},
     'PASSWORDLESS_EMAIL_CALLBACK': 'drfpasswordless.utils.send_email_with_callback_token',
     'PASSWORDLESS_SMS_CALLBACK': 'drfpasswordless.utils.send_sms_with_callback_token',
+    'PASSWORDLESS_CALL_CALLBACK': 'drfpasswordless.utils.send_call_with_callback_token',
 
     # Token Generation Retry Count
     'PASSWORDLESS_TOKEN_GENERATION_ATTEMPTS': 3

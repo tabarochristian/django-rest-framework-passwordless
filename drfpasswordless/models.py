@@ -1,3 +1,4 @@
+# models.py
 import uuid
 from django.db import models
 from django.conf import settings
@@ -60,7 +61,7 @@ class CallbackToken(AbstractBaseCallbackToken):
     TOKEN_TYPE_VERIFY = 'VERIFY'
     TOKEN_TYPES = ((TOKEN_TYPE_AUTH, 'Auth'), (TOKEN_TYPE_VERIFY, 'Verify'))
 
-    key = models.CharField(default=generate_numeric_token, max_length=6)
+    key = models.CharField(max_length=50, default=generate_numeric_token)
     type = models.CharField(max_length=20, choices=TOKEN_TYPES)
 
     class Meta(AbstractBaseCallbackToken.Meta):

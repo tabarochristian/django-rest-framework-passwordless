@@ -1,3 +1,4 @@
+# services.py
 from django.utils.module_loading import import_string
 from drfpasswordless.settings import api_settings
 from drfpasswordless.utils import (
@@ -17,6 +18,8 @@ class TokenService(object):
             send_action = import_string(api_settings.PASSWORDLESS_EMAIL_CALLBACK)
         elif alias_type == 'mobile':
             send_action = import_string(api_settings.PASSWORDLESS_SMS_CALLBACK)
+        elif alias_type == 'call':
+            send_action = import_string(api_settings.PASSWORDLESS_CALL_CALLBACK)
         # Send to alias
         success = send_action(user, token, **message_payload)
         return success

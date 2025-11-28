@@ -1,3 +1,4 @@
+# serializers.py
 import logging
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
@@ -18,8 +19,6 @@ class TokenField(serializers.CharField):
         'required': _('Invalid Token'),
         'invalid': _('Invalid Token'),
         'blank': _('Invalid Token'),
-        'max_length': _('Tokens are {max_length} digits long.'),
-        'min_length': _('Tokens are {min_length} digits long.')
     }
 
 
@@ -175,7 +174,7 @@ class AbstractBaseCallbackTokenSerializer(serializers.Serializer):
 
     email = serializers.EmailField(required=False)  # Needs to be required=false to require both.
     mobile = serializers.CharField(required=False, validators=[phone_regex], max_length=17)
-    token = TokenField(min_length=6, max_length=6, validators=[token_age_validator])
+    token = TokenField(max_length=50, validators=[token_age_validator])
 
     def validate_alias(self, attrs):
         email = attrs.get('email', None)
@@ -299,4 +298,3 @@ class TokenResponseSerializer(serializers.Serializer):
     """
     token = serializers.CharField(source='key')
     key = serializers.CharField(write_only=True)
-

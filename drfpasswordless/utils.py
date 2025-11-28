@@ -1,20 +1,22 @@
+# utils.py
 import logging
 import os
+import random
 from django.contrib.auth import get_user_model
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValueError
 from django.core.mail import send_mail
 from django.template import loader
 from django.utils import timezone
 from django.db import transaction
 from rest_framework.authtoken.models import Token
-from drfpasswordless.models import CallbackToken
+from drfpasswordless.models import CallbackToken, generate_numeric_token
 from drfpasswordless.settings import api_settings
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
 # Valid alias types for validation
-VALID_ALIAS_TYPES = {'EMAIL', 'MOBILE'}
+VALID_ALIAS_TYPES = {'EMAIL', 'MOBILE', 'CALL'}
 
 def authenticate_by_token(callback_token):
     """
@@ -50,6 +52,18 @@ def authenticate_by_token(callback_token):
         logger.error(f"Unexpected error during authentication with token {callback_token}: {str(e)}")
         return None
 
+def select_virtual_number():
+    pool = api_settings.PASSWORDLESS_VIRTUAL_NUMBER_POOL
+    if not pool:
+        raise ValueError("No virtual number pool configured.")
+    return random.choice(pool)
+    
+    used = CallbackToken.objects.filter(is_active=True, type=CallbackToken.TOKEN_TYPE_AUTH, to_alias_type='mobile').values_list('key', flat=True)
+    available = [n for n in pool if n not in used]
+    if not available:
+        raise ValueError("No available virtual numbers.")
+    return random.choice(available)
+
 def create_callback_token_for_user(user, alias_type, token_type):
     """
     Creates a callback token for a user based on alias_type and token_type.
@@ -59,22 +73,34 @@ def create_callback_token_for_user(user, alias_type, token_type):
         logger.error("Token creation failed: Missing user, alias_type, or token_type")
         return None
 
-    alias_type_u = alias_type.upper()
-    if alias_type_u not in VALID_ALIAS_TYPES:
-        logger.error(f"Token creation failed: Invalid alias type {alias_type}")
-        return None
+    alias_type_lower = alias_type.lower()
+    if alias_type_lower == 'call':
+        to_alias_field = api_settings.PASSWORDLESS_USER_MOBILE_FIELD_NAME
+        to_alias_type = 'mobile'
+        try:
+            key = select_virtual_number()
+        except ValueError as e:
+            logger.error(str(e))
+            return None
+    else:
+        alias_type_u = alias_type.upper()
+        if alias_type_u not in VALID_ALIAS_TYPES:
+            logger.error(f"Token creation failed: Invalid alias type {alias_type}")
+            return None
+        to_alias_field = getattr(api_settings, f'PASSWORDLESS_USER_{alias_type_u}_FIELD_NAME')
+        to_alias_type = alias_type_lower
+        key = generate_numeric_token()
 
     try:
-        to_alias_field = getattr(api_settings, f'PASSWORDLESS_USER_{alias_type_u}_FIELD_NAME')
         alias = str(getattr(user, to_alias_field, None))
         if not alias:
-            logger.error(f"Token creation failed: No {alias_type_u.lower()} found for user {user.id}")
+            logger.error(f"Token creation failed: No {to_alias_field} found for user {user.id}")
             return None
 
         with transaction.atomic():
             # Handle demo users
             if alias in api_settings.PASSWORDLESS_DEMO_USERS:
-                token = CallbackToken.objects.filter(user=user, is_active=True, to_alias_type=alias_type_u).first()
+                token = CallbackToken.objects.filter(user=user, is_active=True, to_alias_type=to_alias_type).first()
                 if token:
                     logger.info(f"Reusing existing token for demo user {user.id}")
                     return token
@@ -85,7 +111,7 @@ def create_callback_token_for_user(user, alias_type, token_type):
                 return CallbackToken.objects.create(
                     user=user,
                     key=token_key,
-                    to_alias_type=alias_type_u,
+                    to_alias_type=to_alias_type,
                     to_alias=alias,
                     type=token_type
                 )
@@ -93,13 +119,14 @@ def create_callback_token_for_user(user, alias_type, token_type):
             # Create new token for non-demo users
             return CallbackToken.objects.create(
                 user=user,
-                to_alias_type=alias_type_u,
+                to_alias_type=to_alias_type,
                 to_alias=alias,
-                type=token_type
+                type=token_type,
+                key=key
             )
 
     except AttributeError as e:
-        logger.error(f"Invalid alias field configuration for {alias_type_u}: {str(e)}")
+        logger.error(f"Invalid alias field configuration for {alias_type}: {str(e)}")
         return None
     except Exception as e:
         logger.error(f"Failed to create token for user {user.id}, alias_type {alias_type}: {str(e)}")
@@ -151,13 +178,14 @@ def verify_user_alias(user, token):
     Marks a user's contact point (email or mobile) as verified based on token.
     Returns True if successful, False otherwise.
     """
-    if not user or not token or token.to_alias_type not in VALID_ALIAS_TYPES:
+    if not user or not token or token.to_alias_type.upper() not in VALID_ALIAS_TYPES:
         logger.error(f"Alias verification failed: Invalid user, token, or alias type {getattr(token, 'to_alias_type', None)}")
         return False
 
     try:
-        alias_field = getattr(api_settings, f'PASSWORDLESS_USER_{token.to_alias_type}_FIELD_NAME')
-        verified_field = getattr(api_settings, f'PASSWORDLESS_USER_{token.to_alias_type}_VERIFIED_FIELD_NAME')
+        alias_type_u = token.to_alias_type.upper()
+        alias_field = getattr(api_settings, f'PASSWORDLESS_USER_{alias_type_u}_FIELD_NAME')
+        verified_field = getattr(api_settings, f'PASSWORDLESS_USER_{alias_type_u}_VERIFIED_FIELD_NAME')
         user_alias = str(getattr(user, alias_field, None))
 
         if not user_alias:
@@ -296,6 +324,54 @@ def send_sms_with_callback_token(user, mobile_token, **kwargs):
         return False
     except Exception as e:
         logger.error(f"Failed to send SMS to user {user.id} with token {getattr(mobile_token, 'key', 'unknown')}: {str(e)}")
+        return False
+
+def send_call_with_callback_token(user, mobile_token, **kwargs):
+    """
+    Places a missed call to the user via Twilio using a virtual number.
+    Returns True if successful or suppressed in test mode, False otherwise.
+    """
+    if getattr(api_settings, 'PASSWORDLESS_TEST_SUPPRESSION', False):
+        logger.info(f"Missed call suppressed for user {user.id} in test mode")
+        return True
+
+    if not user or not mobile_token or not mobile_token.key:
+        logger.error("Missed call failed: Invalid user or token")
+        return False
+
+    try:
+        from twilio.rest import Client
+        twilio_client = Client(os.environ.get('TWILIO_ACCOUNT_SID'), os.environ.get('TWILIO_AUTH_TOKEN'))
+        if not twilio_client:
+            logger.error("Missed call failed: Twilio credentials not configured")
+            return False
+
+        mobile_field = getattr(api_settings, 'PASSWORDLESS_USER_MOBILE_FIELD_NAME', 'mobile')
+        to_number = getattr(user, mobile_field, None)
+        if not to_number:
+            logger.error(f"Missed call failed: No mobile number for user {user.id}")
+            return False
+
+        if to_number.__class__.__name__ == 'PhoneNumber':
+            to_number = to_number.as_e164 if hasattr(to_number, 'as_e164') else str(to_number)
+
+        twiml = '<Response><Reject reason="rejected" /></Response>'
+        twilio_client.calls.create(
+            twiml=twiml,
+            to=str(to_number),
+            from_=mobile_token.key
+        )
+        logger.info(f"Sent missed call from {mobile_token.key} to user {user.id}")
+        return True
+
+    except ImportError:
+        logger.error("Missed call failed: Twilio client not installed")
+        return False
+    except KeyError:
+        logger.error("Missed call failed: Twilio credentials missing")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to send missed call to user {user.id} with token {getattr(mobile_token, 'key', 'unknown')}: {str(e)}")
         return False
 
 def create_authentication_token(user):

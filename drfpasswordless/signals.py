@@ -1,3 +1,4 @@
+# signals.py
 import logging
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -35,27 +36,31 @@ def check_unique_tokens(sender, instance, **kwargs):
         # save is called on a token to create it in the db
         # before creating check whether a token with the same key exists
         if isinstance(instance, CallbackToken):
-            unique = False
-            tries = 0
-                
-            if CallbackToken.objects.filter(key=instance.key, is_active=True).exists():
-                # Try N(default=3) times before giving up.
-                while tries < api_settings.PASSWORDLESS_TOKEN_GENERATION_ATTEMPTS:
-                    tries = tries + 1
-                    new_key = generate_numeric_token()
-                    instance.key = new_key
-                
-                    if not CallbackToken.objects.filter(key=instance.key, is_active=True).exists():
-                        # Leave the loop if we found a valid token that doesn't exist yet.
-                        unique = True
-                        break
+            if len(instance.key) == 6:
+                unique = False
+                tries = 0
+                    
+                if CallbackToken.objects.filter(key=instance.key, is_active=True).exists():
+                    # Try N(default=3) times before giving up.
+                    while tries < api_settings.PASSWORDLESS_TOKEN_GENERATION_ATTEMPTS:
+                        tries = tries + 1
+                        new_key = generate_numeric_token()
+                        instance.key = new_key
+                    
+                        if not CallbackToken.objects.filter(key=instance.key, is_active=True).exists():
+                            # Leave the loop if we found a valid token that doesn't exist yet.
+                            unique = True
+                            break
 
-                if not unique:
-                    # A unique value wasn't found after three tries
-                    raise ValidationError("Couldn't create a unique token even after retrying.")
+                    if not unique:
+                        # A unique value wasn't found after three tries
+                        raise ValidationError("Couldn't create a unique token even after retrying.")
+                else:
+                    # A unique value was found immediately.
+                    pass
             else:
-                # A unique value was found immediately.
-                pass
+                if CallbackToken.objects.filter(key=instance.key, is_active=True).exists():
+                    raise ValidationError("Virtual number already in use.")
 
         
     else:
