@@ -13,7 +13,9 @@ app_name = 'drfpasswordless'
 
 urlpatterns = [
      path(api_settings.PASSWORDLESS_AUTH_PREFIX + 'email/', ObtainEmailCallbackToken.as_view(), name='auth_email'),
-     path(api_settings.PASSWORDLESS_AUTH_PREFIX + 'mobile/', ObtainMobileCallbackToken.as_view(), name='auth_mobile'),
+     path(api_settings.PASSWORDLESS_AUTH_PREFIX + 'mobile/sms', ObtainMobileCallbackToken.as_view(), name='auth_mobile'),
+     path(api_settings.PASSWORDLESS_AUTH_PREFIX + 'mobile/call', ObtainMobileCallbackToken.as_view(), name='auth_mobile'),
+     
      path(api_settings.PASSWORDLESS_AUTH_PREFIX + 'token/', ObtainAuthTokenFromCallbackToken.as_view(), name='auth_token'),
      path(api_settings.PASSWORDLESS_VERIFY_PREFIX + 'email/', ObtainEmailVerificationCallbackToken.as_view(), name='verify_email'),
      path(api_settings.PASSWORDLESS_VERIFY_PREFIX + 'mobile/', ObtainMobileVerificationCallbackToken.as_view(), name='verify_mobile'),
